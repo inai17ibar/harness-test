@@ -1,0 +1,5 @@
+{
+  "number": 1,
+  "title": "subtract 関数を実装してください",
+  "body": "`src/subtract.js` に `subtract(a, b)` 関数を実装してください。\n\nテストファイル: `src/subtract.test.js`\nテスト実行: `node --test src/subtract.test.js`\n\n## 期待する動作\n- `subtract(10, 3)` → `7`\n- `subtract(3, 10)` → `-7`\n- `subtract(5, 5)` → `0`"
+}

@@ -1,0 +1,5 @@
+{
+  "number": 3,
+  "title": "clamp 関数を実装してください",
+  "body": "`src/clamp.js` に `clamp(value, min, max)` 関数を実装してください。\n\nテストファイル: `src/clamp.test.js`\nテスト実行: `node --test src/clamp.test.js`\n\n## 期待する動作\n- `clamp(5, 0, 10)` → `5` (範囲内)\n- `clamp(-5, 0, 10)` → `0` (min未満)\n- `clamp(15, 0, 10)` → `10` (max超過)"
+}
