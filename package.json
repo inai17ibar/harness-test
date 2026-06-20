@@ -1,0 +1,7 @@
+{
+  "name": "harness-test-repo",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --test src/**/*.test.js 2>&1 || node --test src/*.test.js"
+  }
+}
