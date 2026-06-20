@@ -1,0 +1,39 @@
+name: Cleanup merged branches
+
+on:
+  schedule:
+    - cron: '0 18 * * *'  # 毎日 18:00 UTC (= 03:00 JST)
+  workflow_dispatch:       # 手動実行も可
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete merged agent/ccx branches
+        run: |
+          DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's|refs/remotes/origin/||')
+          echo "デフォルトブランチ: $DEFAULT"
+          
+          git fetch --prune
+          
+          # マージ済みの agent/* と ccx/* ブランチを削除
+          for branch in $(git branch -r --merged "origin/$DEFAULT" | grep -E 'origin/(agent|ccx)/' | sed 's|origin/||'); do
+            echo "削除: $branch"
+            git push origin --delete "$branch" 2>&1 || echo "  失敗 (既に削除済み?)"
+          done
+
+          # 30日以上前の agent/* ブランチも削除 (マージされなかったゴミ)
+          NOW=$(date +%s)
+          THIRTY_DAYS_AGO=$((NOW - 30 * 86400))
+          for branch in $(git branch -r | grep -E 'origin/agent/' | sed 's|origin/||'); do
+            commit_date=$(git log -1 --format=%ct "origin/$branch" 2>/dev/null || echo 0)
+            if [ "$commit_date" -lt "$THIRTY_DAYS_AGO" ] && [ "$commit_date" -gt 0 ]; then
+              echo "30日経過削除: $branch"
+              git push origin --delete "$branch" 2>&1 || true
+            fi
+          done

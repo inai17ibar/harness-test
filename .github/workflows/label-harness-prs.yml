@@ -1,0 +1,21 @@
+name: Label harness PRs
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'agent/issue-') || startsWith(github.head_ref, 'ccx/')
+    steps:
+      - name: Add harness-bot label
+        run: |
+          gh pr edit "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --add-label "harness-bot"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
