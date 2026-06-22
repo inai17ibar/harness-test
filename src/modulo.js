@@ -1,1 +1,3 @@
-export function modulo() {}
+export function modulo(a, b) {
+  return a % b;
+}
