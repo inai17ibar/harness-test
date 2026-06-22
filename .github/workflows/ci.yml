@@ -13,6 +13,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # PRの場合、base との比較のため十分な履歴を取得
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,7 +30,64 @@ jobs:
             npm install
           fi
 
-      - name: Run tests
+      - name: Determine test scope
+        id: scope
+        run: |
+          # PR の場合: base との差分
+          # push の場合: 直前commitとの差分
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          echo "Base: $BASE_SHA"
+          echo "Head: $HEAD_SHA"
+
+          # 変更された .js ファイル (src/ 配下)
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null | grep -E '^src/.*\.js$' || true)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # 対応するテストファイルを収集
+          # foo.js → foo.test.js, foo.test.js → foo.test.js (それ自身)
+          declare -A test_set
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            if [[ "$f" == *.test.js ]]; then
+              test_set[$f]=1
+            else
+              # foo.js → foo.test.js
+              base="${f%.js}.test.js"
+              if [ -f "$base" ]; then
+                test_set[$base]=1
+              fi
+            fi
+          done <<< "$CHANGED"
+
+          TESTS="${!test_set[*]}"
+          
+          # 変更がない or マッチするテストがなければ全テスト実行 (master push時など)
+          if [ -z "$TESTS" ] || [ "${{ github.event_name }}" = "push" ]; then
+            echo "scope=all" >> "$GITHUB_OUTPUT"
+            echo "tests=" >> "$GITHUB_OUTPUT"
+            echo "scope: all"
+          else
+            echo "scope=focused" >> "$GITHUB_OUTPUT"
+            echo "tests=$TESTS" >> "$GITHUB_OUTPUT"
+            echo "scope: focused ($TESTS)"
+          fi
+
+      - name: Run tests (focused)
+        if: steps.scope.outputs.scope == 'focused'
+        run: |
+          echo "Running focused tests: ${{ steps.scope.outputs.tests }}"
+          node --test ${{ steps.scope.outputs.tests }}
+
+      - name: Run all tests
+        if: steps.scope.outputs.scope == 'all'
         run: |
           if [ -f package.json ]; then
             npm test
