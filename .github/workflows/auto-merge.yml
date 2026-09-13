@@ -14,14 +14,54 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'pull_request' && 
-       (startsWith(github.head_ref, 'agent/issue-') || 
+      (github.event_name == 'pull_request' &&
+       (startsWith(github.head_ref, 'agent/issue-') ||
         contains(github.event.pull_request.labels.*.name, 'harness-bot'))) ||
       github.event_name == 'check_suite'
 
     steps:
       - name: Enable auto-merge
-        run: |
-          gh pr merge --auto --merge --delete-branch "${{ github.event.pull_request.number }}" || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # check_suite イベントには github.event.pull_request が無い (null)。
+          # PR 番号は check_suite.pull_requests[] から取る。
+          PR_NUMBERS: >-
+            ${{ github.event_name == 'pull_request'
+                && github.event.pull_request.number
+                || join(github.event.check_suite.pull_requests.*.number, ' ') }}
+        run: |
+          # checkout していないので gh はリポジトリを git から判定できない。
+          # -R を付けないと "fatal: not a git repository" で失敗する。
+          if [ -z "$(echo "$PR_NUMBERS" | tr -d ' ')" ]; then
+            echo "対象の PR がありません (event=${{ github.event_name }})"
+            exit 0
+          fi
+
+          for pr in $PR_NUMBERS; do
+            echo "── PR #$pr ──"
+
+            # check_suite 経路にはブランチの絞り込みが無いので、ここで判定する。
+            # これが無いと harness と無関係な PR まで自動マージしてしまう。
+            info=$(gh pr view "$pr" -R "$REPO" \
+              --json headRefName,labels,state \
+              -q '.state + " " + .headRefName + " " + ([.labels[].name] | join(","))' \
+              2>/dev/null) || { echo "  ⚠️  PR 情報を取得できませんでした"; continue; }
+
+            case "$info" in
+              OPEN*) ;;
+              *) echo "  ⏭️  OPEN ではありません: $info"; continue ;;
+            esac
+            case "$info" in
+              *" agent/issue-"*|*harness-bot*) ;;
+              *) echo "  ⏭️  harness の PR ではありません: $info"; continue ;;
+            esac
+
+            # 既にマージ済み等でジョブは落とさないが、理由はログに残す。
+            # 以前は `|| true` で握り潰していたため、失敗が pass に見えていた。
+            if gh pr merge --auto --merge --delete-branch -R "$REPO" "$pr"; then
+              echo "  ✅ auto-merge を有効化"
+            else
+              echo "  ⚠️  auto-merge を有効化できませんでした (上のエラーを参照)"
+            fi
+          done
