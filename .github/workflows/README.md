@@ -1,6 +1,6 @@
 # Claude Dev Harness — GitHub Actions
 
-このディレクトリには Claude Dev Harness と連携する 4 つのワークフローがあります。
+このディレクトリには Claude Dev Harness と連携する 6 つのワークフローがあります。
 
 ## ワークフロー
 
@@ -10,6 +10,12 @@
 | `label-harness-prs.yml` | `agent/*` `ccx/*` ブランチのPRに `harness-bot` ラベル付与 |
 | `auto-merge.yml` | `harness-bot` ラベル付きPRをCI通過で自動マージ |
 | `cleanup-branches.yml` | 毎日 3時(JST) にマージ済みブランチを削除 |
+| `discover-issues.yml` | 毎日 3時(JST) に課題を自動発見して issue 起票 (既定は DRY RUN) |
+| `sync-labels.yml` | `.github/labels.yml` の内容を GitHub のラベルへ反映 |
+
+課題発見パイプラインの設計・運用は `docs/autonomous-issue-discovery.md` を参照。
+起票された issue を自動実装 harness に流すには `harness-ready` ラベルが必要で、
+これは人間だけが付ける (未レビューのコード変更が master に入るのを防ぐため)。
 
 ## セットアップ
 
@@ -24,10 +30,13 @@ git push
 
 ### 2. ラベルを作成
 
+`.github/labels.yml` にすべてのラベルが定義されている。次のどちらかで反映する。
+
 ```bash
-gh label create harness-bot \
-  --description "PR created by Claude Dev Harness" \
-  --color 8B5CF6
+# ローカルから一括反映
+GITHUB_TOKEN=<token> node scripts/discovery/sync-labels.mjs
+
+# または .github/labels.yml を push すれば sync-labels.yml が自動実行される
 ```
 
 ### 3. リポジトリ設定

@@ -1,0 +1,98 @@
+name: Discover issues
+
+# 自律的な課題発見パイプライン。
+# Collect (決定的) → Judge (LLM 1 コール) → Publish (決定的) の 3 段。
+# 新規 signal が 0 件なら Judge を呼ばないので、変更のない日は API 課金が発生しない。
+
+on:
+  schedule:
+    - cron: '0 18 * * *'   # 毎日 18:00 UTC (= 03:00 JST)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '起票せずレポートだけ出す'
+        type: boolean
+        default: true
+      model:
+        description: 'Judge に使うモデル'
+        type: choice
+        default: claude-haiku-4-5
+        options:
+          - claude-haiku-4-5
+          - claude-sonnet-5-5
+          - claude-opus-5-5
+      max_issues:
+        description: '1 回の実行で起票する上限'
+        default: '5'
+
+# issue を書く以外の権限は与えない。コード変更は一切できない構成。
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: discover-issues
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DISCOVERY_MODEL: ${{ inputs.model || 'claude-haiku-4-5' }}
+      DISCOVERY_MAX_ISSUES: ${{ inputs.max_issues || '5' }}
+      # DRY RUN の決め方:
+      #   手動実行 … チェックボックス inputs.dry_run に従う
+      #   定期実行 … リポジトリ変数 DISCOVERY_DRY_RUN。未設定なら 'true' (起票しない)
+      # 本番化するときは Settings > Variables で DISCOVERY_DRY_RUN=false を設定する。
+      # inputs.dry_run を直接見ると、定期実行では null == false が true に評価されて
+      # 安全側の既定が反転してしまうので、event_name で明示的に分岐している。
+      DRY_RUN: >-
+        ${{ github.event_name == 'workflow_dispatch'
+            && (inputs.dry_run && 'true' || 'false')
+            || vars.DISCOVERY_DRY_RUN || 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sync labels
+        run: node scripts/discovery/sync-labels.mjs
+
+      - name: Collect signals
+        id: collect
+        run: node scripts/discovery/collect.mjs
+
+      - name: Install Anthropic SDK
+        if: steps.collect.outputs.new_signals != '0'
+        run: npm install --no-save --no-audit --no-fund "@anthropic-ai/sdk@^0.133.0"
+
+      - name: Judge signals
+        if: steps.collect.outputs.new_signals != '0'
+        run: node scripts/discovery/judge.mjs
+
+      - name: Publish issues
+        if: steps.collect.outputs.new_signals != '0'
+        run: node scripts/discovery/publish.mjs
+
+      - name: Report (no new signals)
+        if: steps.collect.outputs.new_signals == '0'
+        run: |
+          echo "## 自動発見パイプライン" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "新規の signal はありませんでした。LLM は呼んでいないため API 課金はゼロです。" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-${{ github.run_number }}
+          path: .discovery/
+          if-no-files-found: ignore
+          retention-days: 30

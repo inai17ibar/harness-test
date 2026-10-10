@@ -1,0 +1,59 @@
+# ラベル定義 — single source of truth。
+# scripts/discovery/sync-labels.mjs が冪等に GitHub へ反映する (削除はしない)。
+#
+# 形式の制約: トップレベルは `- name: ...` のフラットなリストのみ。
+# ネストや複数行文字列は非対応 (パーサが例外を投げる)。
+
+# ---- type: 何をする issue か (必ず 1 つ) -------------------------------------
+- name: "type:bug"
+  color: "D73A4A"
+  description: "挙動が意図と違う"
+- name: "type:feature"
+  color: "0E8A16"
+  description: "新しい機能・関数の追加"
+- name: "type:refactor"
+  color: "5319E7"
+  description: "挙動を変えない構造の改善"
+- name: "type:test"
+  color: "1D76DB"
+  description: "テストの追加・修正・安定化"
+- name: "type:docs"
+  color: "0075CA"
+  description: "ドキュメントの誤り・欠落・乖離"
+- name: "type:security"
+  color: "B60205"
+  description: "脆弱性・情報露出・権限設定"
+- name: "type:chore"
+  color: "FEF2C0"
+  description: "ビルド・CI・依存・設定"
+
+# ---- priority: 対応順序 (必ず 1 つ) -----------------------------------------
+- name: "P0:critical"
+  color: "B60205"
+  description: "動かない・壊れる・漏れる。即対応"
+- name: "P1:high"
+  color: "D93F0B"
+  description: "誤った結果を返す・テストがない・再現しない"
+- name: "P2:medium"
+  color: "FBCA04"
+  description: "保守性の劣化"
+- name: "P3:low"
+  color: "C2E0C6"
+  description: "あると良い程度"
+
+# ---- meta: 運用フラグ -------------------------------------------------------
+- name: "ai-discovered"
+  color: "8B5CF6"
+  description: "自動発見パイプラインが起票 (重複排除の対象)"
+- name: "needs-triage"
+  color: "EDEDED"
+  description: "人間の確認待ち"
+- name: "harness-ready"
+  color: "A2EEEF"
+  description: "自動実装 harness に流してよい — 人間だけが付ける"
+- name: "wontfix"
+  color: "FFFFFF"
+  description: "対応しない。付けて close すると同じ指摘は二度と起票されない"
+- name: "harness-bot"
+  color: "8B5CF6"
+  description: "Claude Dev Harness が作成した PR"

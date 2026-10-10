@@ -1,0 +1,15 @@
+# 自動発見パイプラインに二度と起票させない指紋の一覧。
+#
+# 通常はこのファイルを手で触る必要はない。
+# 誤検出の issue に `wontfix` を付けて close すれば、次回以降は自動で抑止される。
+#
+# ここに書くのは、issue を作る前に分かっている既知の例外だけ。
+# 指紋は DRY RUN のレポート (.discovery/report.json) か、
+# 起票済み issue 本文末尾の `discovery-fingerprint` コメントから取る。
+#
+# 形式の制約: トップレベルは `- fingerprint: ...` のフラットなリストのみ。
+#
+# 例:
+# - fingerprint: a1b2c3d4e5f6
+#   reason: "意図的な仕様。README に記載済み"
+#   added: "2026-10-10"

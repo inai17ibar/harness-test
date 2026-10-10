@@ -1,0 +1,30 @@
+name: Sync labels
+
+# .github/labels.yml を変更したら GitHub のラベルへ反映する。
+# yml に無いラベルは削除しない (手動運用ラベルを消さないため)。
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '.github/labels.yml'
+      - 'scripts/discovery/sync-labels.mjs'
+      - 'scripts/discovery/lib.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/discovery/sync-labels.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
